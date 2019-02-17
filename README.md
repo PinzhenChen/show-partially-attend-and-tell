@@ -1,4 +1,4 @@
-This is a **[PyTorch](https://pytorch.org) Tutorial to Image Captioning**.
+This is a research project for 2018/19 MLP @Edinburgh based on **Image Captioning using [PyTorch](https://pytorch.org)**.
 
 This is the first in [a series of tutorials](https://github.com/sgrvinod/Deep-Tutorials-for-PyTorch) I plan to write about _implementing_ cool models on your own with the amazing PyTorch library.
 
