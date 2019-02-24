@@ -5,7 +5,7 @@ import torch.utils.data
 import torchvision.transforms as transforms
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence
-from models import Encoder, DecoderWithAttention, DecoderWithoutAttention
+from models import *
 from datasets import *
 from utils import *
 from nltk.translate.bleu_score import corpus_bleu
@@ -16,7 +16,7 @@ data_name = 'flickr8k_5_cap_per_img_5_min_word_freq'  # base name shared by data
 
 # Model parameters
 emb_dim = 512  # dimension of word embeddings
-attention_dim = 512  # dimension of attention linear layers
+attention_dim = 64  # dimension of attention linear layers
 decoder_dim = 512  # dimension of decoder RNN
 dropout = 0.5
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets device for model and PyTorch tensors
@@ -57,14 +57,22 @@ def main():
         #                                decoder_dim=decoder_dim,
         #                                vocab_size=len(word_map),
         #                                dropout=dropout)
-        decoder = DecoderWithAttention(attention_dim=attention_dim,
-                                       embed_dim=emb_dim,
-                                       decoder_dim=decoder_dim,
-                                       vocab_size=len(word_map),
-                                       dropout=dropout)
+
+        # decoder = DecoderWithAttention(attention_dim=attention_dim,
+        #                                embed_dim=emb_dim,
+        #                                decoder_dim=decoder_dim,
+        #                                vocab_size=len(word_map),
+        #                                dropout=dropout)
+
+        decoder = DecoderWithAdaptiveAttention(hidden_size = 64,
+                                   vocab_size = len(word_map),
+                                   att_dim = attention_dim,
+                                   embed_size = emb_dim)
+
         decoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, decoder.parameters()),
                                              lr=decoder_lr)
-        encoder = Encoder()
+        # encoder = Encoder()
+        encoder = Encoder(hidden_size = 64, embed_size = emb_dim)
         encoder.fine_tune(fine_tune_encoder)
         encoder_optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, encoder.parameters()),
                                              lr=encoder_lr) if fine_tune_encoder else None
@@ -173,11 +181,17 @@ def train(train_loader, encoder, decoder, criterion, encoder_optimizer, decoder_
         caplens = caplens.to(device)
 
         # Forward prop.
-        imgs = encoder(imgs)
-        scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens)
+        # imgs = encoder(imgs)
+        # scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens)
 
         # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
-        targets = caps_sorted[:, 1:]
+        # targets = caps_sorted[:, 1:]
+        #######################################
+        spatial_image, global_image, enc_image = encoder(imgs)
+        scores, alphas, betas, encoded_captions, decode_lengths, sort_ind = decoder(spatial_image, global_image,
+                                                                                         caps, caplens, enc_image)
+        # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
+        targets = encoded_captions[:, 1:]
 
         # Remove timesteps that we didn't decode at, or are pads
         # pack_padded_sequence is an easy trick to do this
@@ -260,11 +274,11 @@ def validate(val_loader, encoder, decoder, criterion):
 
         # Forward prop.
         if encoder is not None:
-            imgs = encoder(imgs)
-        scores, caps_sorted, decode_lengths, alphas, sort_ind = decoder(imgs, caps, caplens)
-
+            spatial_image, global_image, enc_image = encoder(imgs)
+        scores, alphas, betas, encoded_captions, decode_lengths, sort_ind = decoder(spatial_image, global_image,
+                                                                                    caps, caplens, enc_image)
         # Since we decoded starting with <start>, the targets are all words after <start>, up to <end>
-        targets = caps_sorted[:, 1:]
+        targets = encoded_captions[:, 1:]
 
         # Remove timesteps that we didn't decode at, or are pads
         # pack_padded_sequence is an easy trick to do this
