@@ -5,6 +5,8 @@ import math
 
 
 file = "test.png"
+img = cv2.imread(file)
+cv2.imshow('Original', img)
 
 # Multidirectional Wave
 
@@ -40,7 +42,7 @@ cv2.imshow('Concave', img_output)
 
 # Change brightness
 img = cv2.cvtColor(cv2.imread(file), cv2.COLOR_BGR2HSV)
-img = np.where(255 - img[:,:,2] < 100, 255, img[:,:,2] + 100)
+img[:,:,2] = np.where(255 - img[:,:,2] < 100, 255, img[:,:,2] + 100)
 img_output = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
 cv2.imshow('Brightness', img_output)
 
