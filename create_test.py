@@ -3,8 +3,8 @@ import cv2
 import numpy as np
 import math
 import os
-# from skimage.util import random_noise
-# from skimage import io
+from skimage.util import random_noise
+from skimage import io
 
 
 def show_original(file):
@@ -72,12 +72,13 @@ def add_noise(file):
 
 if __name__ == "__main__":
 
-    print("Note: you need to create directories under ./tests/ first to save images")
+    print("Note: you need to create empty directories under './tests/' first to save images")
+    print("Names are 'bright', 'noise', 'concave' and 'multidir'.")
     files = os.listdir("tests")
     files = [f for f in files if "png" in f or "jpg" in f]
     for file in files:
         multi_dir(file)
         concave(file)
         brighter(file)
-        #add_noise(file)
+        add_noise(file)
 
