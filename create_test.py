@@ -6,6 +6,14 @@ import os
 from skimage.util import random_noise
 from skimage import io
 
+'''
+
+Ensure test images are in ./tests/
+Then you need to create empty directories under './tests/' first to save images
+Names are 'bright', 'noise', 'concave' and 'multidir'
+Finally run 'python3 create_test.py'
+
+'''
 
 def show_original(file):
     img = cv2.imread('tests/' + file)
