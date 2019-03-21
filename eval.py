@@ -9,10 +9,10 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 # Parameters
-data_folder = 'dataset'  # folder with data files saved by create_input_files.py
+data_folder = 'dataset_gaussian_0.01'  # folder with data files saved by create_input_files.py
 data_name = 'flickr8k_5_cap_per_img_5_min_word_freq'  # base name shared by data files
-checkpoint = 'with_att_without_finetune/BEST_checkpoint_flickr8k_5_cap_per_img_5_min_word_freq.pth.tar'  # model checkpoint
-word_map_file = 'dataset/WORDMAP_flickr8k_5_cap_per_img_5_min_word_freq.json'  # word map, ensure it's the same the data was encoded with and the model was trained with
+checkpoint = 'BEST_checkpoint_flickr8k_5_cap_per_img_5_min_word_freq.pth.tar'  # model checkpoint
+word_map_file = 'dataset_gaussian_0.01/WORDMAP_flickr8k_5_cap_per_img_5_min_word_freq.json'  # word map, ensure it's the same the data was encoded with and the model was trained with
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets device for model and PyTorch tensors
 device = torch.device("cuda")
 torch.cuda.set_device(0)
@@ -48,7 +48,7 @@ def evaluate(beam_size):
     """
     # DataLoader
     loader = torch.utils.data.DataLoader(
-        CaptionDataset(data_folder, data_name, 'VAL', transform=transforms.Compose([normalize])),
+        CaptionDataset(data_folder, data_name, 'TEST', transform=transforms.Compose([normalize])),
         batch_size=1, shuffle=True, num_workers=1, pin_memory=True)
 
     # TODO: Batched Beam Search
@@ -101,16 +101,22 @@ def evaluate(beam_size):
         while True:
 
             embeddings = decoder.embedding(k_prev_words).squeeze(1)  # (s, embed_dim)
+            # embeddings = decoder.embedding(k_prev_words)# (s, embed_dim)
 
-            awe, _ = decoder.attention(encoder_out, h)  # (s, encoder_dim), (s, num_pixels)
+            # awe, _ = decoder.attention(encoder_out, h)  # (s, encoder_dim), (s, num_pixels)
 
-            gate = decoder.sigmoid(decoder.f_beta(h))  # gating scalar, (s, encoder_dim)
-            awe = gate * awe
+            # gate = decoder.sigmoid(decoder.f_beta(h))  # gating scalar, (s, encoder_dim)
+            # awe = gate * awe
 
-            h, c = decoder.decode_step(torch.cat([embeddings, awe], dim=1), (h, c))  # (s, decoder_dim)
+            # awe = gate
 
-            scores = decoder.fc(h)  # (s, vocab_size)
+            # h, c = decoder.decode_step(torch.cat([embeddings, awe], dim=1), (h, c))  # (s, decoder_dim)
+            # print(embeddings.shape)
+            h, c = decoder.decode_step(torch.cat([embeddings, encoder_out.sum(dim=1).squeeze(1)], dim=1), (h, c))  # (s, decoder_dim)
+
+            scores = decoder.fc(decoder.linear(h))  # (s, vocab_size)
             scores = F.log_softmax(scores, dim=1)
+
 
             # Add
             scores = top_k_scores.expand_as(scores) + scores  # (s, vocab_size)
@@ -133,7 +139,8 @@ def evaluate(beam_size):
             incomplete_inds = [ind for ind, next_word in enumerate(next_word_inds) if
                                next_word != word_map['<end>']]
             complete_inds = list(set(range(len(next_word_inds))) - set(incomplete_inds))
-
+            # print(seqs)
+            # print(incomplete_inds)
             # Set aside complete sequences
             if len(complete_inds) > 0:
                 complete_seqs.extend(seqs[complete_inds].tolist())
@@ -154,9 +161,11 @@ def evaluate(beam_size):
             if step > 50:
                 break
             step += 1
-
-        i = complete_seqs_scores.index(max(complete_seqs_scores))
-        seq = complete_seqs[i]
+        try:
+            i = complete_seqs_scores.index(max(complete_seqs_scores))
+            seq = complete_seqs[i]
+        except ValueError:
+            seq = seqs[0][:20]
 
         # References
         img_caps = allcaps[0].tolist()
